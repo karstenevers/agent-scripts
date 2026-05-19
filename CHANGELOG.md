@@ -4,6 +4,9 @@ summary: Timeline of guardrail helper changes mirrored from Sweetistics and rela
 
 # Changelog
 
+## 2026-05-19 — Codex Review Agent Capsa Transport
+- Updated `codex-review` guidance to default reviews through Agent Capsa and fixed non-yolo helper dry-runs when `--no-yolo` or `CODEX_REVIEW_YOLO=0` is set.
+
 ## 2026-05-18 — 1Password Exact Field Reads
 - Updated `one-password` to avoid tmux window-index assumptions and document exact-label JSON extraction when `op --field` resolves an ambiguous concealed field.
 

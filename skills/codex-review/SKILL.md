@@ -22,7 +22,8 @@ Use when:
 - Keep going until Codex review returns no accepted/actionable findings.
 - If a review-triggered fix changes code, rerun focused tests and rerun Codex review.
 - For security-audit suppression changes, verify accepted findings remain auditable: suppressed findings stay in structured output, active output keeps an unsuppressible suppression notice, and aggregate findings cannot hide unrelated active risk.
-- Never switch or override the review model. If the review hits model capacity, retry the same command a few times with the same model. The helper runs nested review in yolo/full-access mode by default; use `--no-yolo` only when intentionally testing sandbox behavior.
+- Default to Agent Capsa for Codex review: `CAPSA_BACKEND=sbx capsa review`. This routes nested Codex through `capsa-codex` while keeping yolo/full-access inside the selected Agent Sandbox.
+- Never switch or override the review model. If the review hits model capacity, retry the same command a few times with the same model. The helper runs nested review in yolo/full-access mode by default; use `--no-yolo` only when intentionally testing non-yolo behavior inside the Agent Capsa sandbox.
 - Stop as soon as the review command/helper exits 0 with no accepted/actionable findings. Do not run an extra direct `codex review` just to get a nicer "clean" line, a second opinion, or clearer closeout wording.
 - Treat the helper's successful exit plus absence of actionable findings as the clean review result, even if the underlying Codex CLI output is terse.
 - If rejecting a finding as intentional/not worth fixing, add a brief inline code comment only when it explains a real invariant or ownership decision that future reviewers should know.
@@ -35,7 +36,7 @@ Use when:
 Dirty local work:
 
 ```bash
-codex review --uncommitted
+CAPSA_BACKEND=sbx capsa review --mode local
 ```
 
 Use this only when the patch is actually unstaged/staged/untracked in the
@@ -48,7 +49,7 @@ Branch/PR work:
 
 ```bash
 git fetch origin
-codex review --base origin/main
+CAPSA_BACKEND=sbx capsa review --mode branch --base origin/main
 ```
 
 Do not pass any prompt with `--base`. Some Codex CLI versions reject both inline
@@ -61,19 +62,13 @@ If an open PR exists, use its actual base:
 
 ```bash
 base=$(gh pr view --json baseRefName --jq .baseRefName)
-codex review --base "origin/$base"
+CAPSA_BACKEND=sbx capsa review --mode branch --base "origin/$base"
 ```
 
 Committed single change:
 
 ```bash
-codex review --commit HEAD
-```
-
-or with the helper:
-
-```bash
-/Users/steipete/Projects/agent-scripts/skills/codex-review/scripts/codex-review --mode commit --commit HEAD
+CAPSA_BACKEND=sbx capsa review --mode commit --commit HEAD
 ```
 
 Use commit review for already-landed or already-pushed work on `main`. Reviewing
@@ -86,7 +81,7 @@ with `--base`.
 Format first if formatting can change line locations. Then it is OK to run tests and review in parallel:
 
 ```bash
-scripts/codex-review --parallel-tests "<focused test command>"
+CAPSA_BACKEND=sbx capsa review --parallel-tests "<focused test command>"
 ```
 
 Tradeoff: tests may force code changes that stale the review. If tests or review lead to code edits, rerun the affected tests and rerun review until no accepted/actionable findings remain. Once that rerun exits cleanly, stop; do not spend another long review cycle on redundant confirmation.
@@ -101,6 +96,36 @@ Codex review is usually noisy. Default to a subagent filter when subagents are a
 Run inline only for tiny changes or when subagents are unavailable.
 
 ## Helper
+
+Default transport:
+
+```bash
+CAPSA_BACKEND=sbx capsa review
+```
+
+Agent Capsa invokes the bundled helper and sets `CODEX_BIN` to `capsa-codex`.
+Do not pass `--codex-bin` during normal reviews. That bypasses the Agent Capsa
+transport decision and is only for intentional debugging.
+
+Pass normal helper flags after `review`:
+
+```bash
+CAPSA_BACKEND=sbx capsa review --mode local
+CAPSA_BACKEND=sbx capsa review --mode branch --base origin/main
+CAPSA_BACKEND=sbx capsa review --mode commit --commit HEAD
+CAPSA_BACKEND=sbx capsa review --parallel-tests "<focused test command>"
+```
+
+Keep yolo enabled by default. The helper passes
+`--dangerously-bypass-approvals-and-sandbox`; with Agent Capsa, that yolo mode
+runs inside the selected sandbox backend instead of directly on the host.
+
+Before first use on a machine, `capsa` and `capsa-codex` must be on `PATH`.
+Run `capsa doctor --backend sbx` when setup or auth is unclear.
+
+Run the helper directly only when Agent Capsa is unavailable, intentionally
+bypassed, or the user explicitly asks for a non-Agent-Capsa review. Report that
+fallback clearly.
 
 Bundled helper:
 
@@ -123,9 +148,9 @@ The helper:
 - should be left in `--mode auto` or forced to `--mode branch` for PR/branch work; do not force `--mode local` after committing
 - writes only to stdout unless `--output` or `CODEX_REVIEW_OUTPUT` is set
 - supports `--dry-run`, `--parallel-tests`, and commit refs
-- runs nested review with `--dangerously-bypass-approvals-and-sandbox` by default
+- runs nested review with `--dangerously-bypass-approvals-and-sandbox` by default; through Agent Capsa this runs inside the selected Agent Sandbox
 - branch mode may fail on Codex CLI versions that reject `--base` plus the helper's stdin prompt; on that exact parser error, rerun plain `codex review --base <ref>` instead of falling back to a non-Codex reviewer
-- keeps accepting `--full-access`; use `--no-yolo` or `CODEX_REVIEW_YOLO=0` to opt out
+- keeps accepting `--full-access`; use `--no-yolo` or `CODEX_REVIEW_YOLO=0` only when intentionally testing non-yolo behavior
 - prints `codex-review clean: no accepted/actionable findings reported` when the selected review command exits 0
 
 ## Final Report

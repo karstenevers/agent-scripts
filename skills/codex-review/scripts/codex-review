@@ -159,12 +159,16 @@ else
   exit 1
 fi
 
+review_cmd=("$codex_bin")
+if ((${#codex_args[@]})); then
+  review_cmd+=("${codex_args[@]}")
+fi
 if [[ "$review_kind" == local ]]; then
-  review_cmd=("$codex_bin" "${codex_args[@]}" review --uncommitted)
+  review_cmd+=(review --uncommitted)
 elif [[ "$review_kind" == commit ]]; then
-  review_cmd=("$codex_bin" "${codex_args[@]}" review --commit "$commit_ref")
+  review_cmd+=(review --commit "$commit_ref")
 else
-  review_cmd=("$codex_bin" "${codex_args[@]}" review --base "$base_ref")
+  review_cmd+=(review --base "$base_ref")
 fi
 
 printf 'codex-review target: %s\n' "$review_kind"
